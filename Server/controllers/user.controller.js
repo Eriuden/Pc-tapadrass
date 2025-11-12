@@ -1,280 +1,52 @@
-const articleModel = require("../Models/article.model")
-const ObjectId = require("mongoose").Types.ObjectId
-const fs = require("fs")
-const {promisify} = require("util")
-const {uploadErrors} = require("../utils/error.utils")
 const userModel = require("../Models/user.model")
-const pipeline = promisify(require("stream"))
+const ObjectId = require("mongoose").Types.ObjectId
 
-module.exports.readArticle = (res) => {
-    articleModel.find((err,docs) => {
-        if (!err) res.send(docs)
-        else console.log("Erreur de réception" + err) 
-    }).sort ({createdAt: -1}) 
+module.exports.getAllUsers = async (res) => {
+    const users = await userModel.find().select("-password")
+    res.status(200).json(users)
 }
 
-module.exports.createArticle = async (req, res) => {
-    let fileName 
+module.exports.getUser = async (req,res) => {
+    if(!ObjectId.isValid(req.params.id))
+    return res.status(400).send("Id inconnue" + req.params.id)
 
-    if(req.file != null) {
-        try {
-            if (
-                req.file.detectedMimeType != "image/jpg" &&
-                req.file.detectedMimeType != "image/png" &&
-                req.file.detectedMimeType != "image/jpeg" 
-            )
-            throw Error("Invalid file")
+    userModel.findById(req.params.id , (err,docs) => {
+        if(!err) res.send(docs)
+        else console.log("Id inconnue" + err)
+    }).select("-password")
+}
 
-            if (req.file.size > 500000) throw Error ("Taille maximale dépassée")
-        } catch (error) {
-            const errors = uploadErrors(error)
-            return res.status(201).json({errors})
-        }
-        fileName = req.body._id + Date.now() + ".jpg"
-
-        await pipeline(
-            req.file.stream,
-            fs.createWriteStream(
-                `${__dirname}/../client/public/uploads/articleImages/${fileName}`
-            )
-        )
-    }
-
-    const newArticle = new articleModel({
-        picture: req.file != null ? "./uploads/articleImages" + fileName :"",
-        name: req.body.name,
-        typeArticle: req.body.typeArticle,
-        degradationState: req.body.degradationState,
-        price: req.body.price,
-    })
+module.exports.updateUser = async (req,res) => {
+    if(!ObjectId.isValid(req.params.id))
+    return res.status(400).send("Id inconnue" + req.params.id)
 
     try {
-        const article = newArticle.save()
-        return res.Status(201).json(article)
-    } catch (error) {
-        return res.status(400).send(error)
-    }
-}
-
-module.exports.updateArticle = (req, res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue:" + req.params.id)
-
-    const updatedRecord = {
-        picture: req.body.picture,
-        name: req.body.name,
-        typeArticle: req.body.typeArticle,
-        degradationState: req.body.degradationState,
-        price: req.body.price,
-    }
-
-    articleModel.findByIdAndUpdate(
-        req.params.id,
-        { $set: updatedRecord}, 
-        {new: true},
-        (err,docs) => {
-            if (!err) res.send(docs)
-            else console.log("erreur d'update :" + err) 
-        }
-    )
-}
-
-module.exports.deleteArticle = (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id) 
-
-    articleModel.findByIdAndDelete(req.params.id, (err,docs) => {
-        if (!err)res.send(docs)
-        else console.log("Erreur lors de la supression :" + err)
-    })
-}
-
-module.exports.likeArticle = async (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    try {
-        await articleModel.findByIdAndUpdate(
-            req.params.id,
-            { $addToSet: {likers: req.body.id}},
-            {new: true},
-            (err) => {
-                if (err) return res.status(400).send(err)
-            }
-        )
         await userModel.findByIdAndUpdate(
-            req.body.id,
+            {_id: req.params.id},
             {
-                $addToSet: {likes: req.params.id},
+                $set : {
+                    name: req.body.name,
+                }
             },
-            {new:true},
-            (err,docs) => {
-                if (!err) res.send(docs)
-                return res.status(400).send(err)
-            }
-        )
-    } catch(err) {
-        return res.status(400).send(err)
-    }
-}
-
-module.exports.dislikeArticle = async (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    try {
-        await articleModel.findByIdAndUpdate(
-            req.params.id,
-            { $addToSet: {dislikers: req.body.id}},
-            {new: true},
-            (err) => {
-                if (err) return res.status(400).send(err)
-            }
-        )
-        await userModel.findByIdAndUpdate(
-            req.body.id,
-            {
-                $addToSet: {dislikes: req.params.id},
-            },
-            {new:true},
-            (err,docs) => {
-                if (!err) res.send(docs)
-                return res.status(400).send(err)
-            }
-        )
-    } catch(err) {
-        return res.status(400).send(err)
-    }
-}
-
-module.exports.unlikeArticle = async (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    try {
-        await articleModel.findByIdAndUpdate(
-            req.params.id,
-            {
-                $pull: { likers: req.body.id},
-            },
-            {new:true},
-            (err) => {
-                if (err) return res.status(400).send(err)
-            }
-        )
-        await userModel.findByIdAndUpdate(
-            req.body.id,
-            {
-                $pull: {likes: req.params.id},
-            },
-            {news: true},
-            (err,docs) => {
-                if (!err) res.send(docs)
-                return res.status(400).send(err)
-            }
-        )
-    } catch (error) {
-        return res.status(400).send(error)
-    }
-}
-
-module.exports.undislikeArticle = async (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    try {
-        await articleModel.findByIdAndUpdate(
-            req.params.id,
-            {
-                $pull: { dislikers: req.body.id},
-            },
-            {new:true},
-            (err) => {
-                if (err) return res.status(400).send(err)
-            }
-        )
-        await userModel.findByIdAndUpdate(
-            req.body.id,
-            {
-                $pull: {dislikes: req.params.id},
-            },
-            {news: true},
-            (err,docs) => {
-                if (!err) res.send(docs)
-                return res.status(400).send(err)
-            }
-        )
-    } catch (error) {
-        return res.status(400).send(error)
-    }
-}
-
-module.exports.commentArticle = (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-
-    try {
-        return articleModel.findByIdAndUpdate(
-            req.params.id,
-            {
-                $push: {
-                    comments: {
-                        commenterId: req.body.commenterId,
-                        commenterName: req.body.commenterName,
-                        text: req.body.text,
-                        timestamp: new Date().getTime(),
-                    },
-                },
-            },
-            { new:true },
+            { new: true, upsert: false, setDefaultsOnInsert: true},
             (err,docs) => {
                 if (!err) return res.send(docs)
-                else return res.status(400).send(err)
+                if (err) return res.status(500).send({message : err})
             }
         )
     } catch (error) {
-        return res.status(400).send(err)
+        return res.status(500).json({message: err})
     }
 }
 
-module.exports.editCommentArticle = (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    try {
-        return articleModel.findById(req.params.id, (docs) => {
-            const theComment = docs.comment.find((comment)=> 
-            comment._id.equals(req.body.commentId)
-            )
-            if (!theComment) return res.status(404).send("Commentaire introuvable")
-            theComment.text = req.body.text 
+module.exports.deleteUser = async (req, res) => {
+    if(!ObjectId.isValid(req.params.id))
+    return res.status(400).send("Id inconnue" + req.params.id)
 
-            return docs.save((err) => {
-                if (!err) return res.status(200).send(docs)
-                return res.status(500).send(err)
-            })
-        })
+    try {
+        await userModel.findByIdAndDelete({_id: req.params.id})
+        res.status(200).json({message: "Au revoir"})
     } catch (error) {
-        return res.status(400).send(error)
+        return res.status(500).json({message: error})
     }
-}
-
-module.exports.deleteCommentArticle = (req,res) => {
-    if (!ObjectId.isValid(req.params.id))
-        return res.status(400).send("Id inconnue :" + req.params.id)
-    
-    try {
-        return articleModel.findByIdAndUpdate(
-            req.params.id,
-            {
-                $pull: {
-                    comments: {
-                        _id: req.body.commentId,
-                    },
-                },
-            },
-            {new:true},
-            (err,docs)=> {
-                if (!err) return res.send(docs)
-                else return res.status(400).send(err)
-            }
-        )
-    } catch (error) {
-            res.status(400).send(err)
-        }
 }
