@@ -22,7 +22,7 @@ type articlesProps = {
     picture: string,
     name: string,
     typeArticle: string,
-    groupe: string,
+    degradationState: string,
     price: string
     likers:[string],
     dislikers:[string],
@@ -63,19 +63,19 @@ export const updateArticle = ({
     articleId,
     name,
     typeArticle,
-    groupe,
+    degradationState,
     price
 } : articlesProps , dispatch:any
 ) => {
         return axios({
             method:"put",
             url:`${process.env.REACT_APP_API_URL}api/article/${articleId}`,
-            data: { name, typeArticle, groupe, price},
+            data: { name, typeArticle, degradationState, price},
         })
         .then(()=> {
             dispatch({
                 type: UPDATE_ARTICLE,
-                payload: {articleId, name, typeArticle, groupe, price}
+                payload: {articleId, name, typeArticle, degradationState, price}
             })
         })
         .catch((err)=> window.alert(err))
@@ -100,12 +100,12 @@ export const uploadPicture = (data: any, articleId: string , dispatch:any) => {
 }
 
 export const deleteArticle = ({
-    articleId, picture, name, typeArticle, groupe, price
+    articleId, picture, name, typeArticle, degradationState, price
 } : articlesProps, dispatch:any) => {
         return axios ({
             method:"delete",
             url:`${process.env.REACT_APP_API_URL}api/article/${articleId}`,
-            data: {picture, name, typeArticle, groupe, price}
+            data: {picture, name, typeArticle, degradationState, price}
         })
         .then(()=> {
             dispatch({type: DELETE_ARTICLE, payload: {articleId}})
